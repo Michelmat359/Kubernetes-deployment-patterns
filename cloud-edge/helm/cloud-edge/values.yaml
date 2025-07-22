@@ -1,0 +1,10 @@
+cloud:
+  nodeSelector:
+    kubernetes.io/hostname: cloud-node
+  replicas: 1
+edge:
+  nodeSelector:
+    kubernetes.io/hostname: edge-node
+  replicas: 1
+loadGenerator:
+  messageRate: 10

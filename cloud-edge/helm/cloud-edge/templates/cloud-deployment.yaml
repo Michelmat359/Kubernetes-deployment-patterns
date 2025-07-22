@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-manager
+spec:
+  replicas: {{ .Values.cloud.replicas }}
+  selector:
+    matchLabels:
+      app: fleet-manager
+  template:
+    metadata:
+      labels:
+        app: fleet-manager
+    spec:
+      nodeSelector:
+{{ toYaml .Values.cloud.nodeSelector | indent 8 }}
+      containers:
+        - name: manager
+          image: ros:humble
+          command: ["ros2", "run", "demo_nodes_cpp", "talker"]

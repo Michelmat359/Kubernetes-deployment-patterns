@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talker
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: talker
+  template:
+    metadata:
+      labels:
+        app: talker
+    spec:
+      containers:
+        - name: talker
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["ros2", "run", "demo_nodes_cpp", "talker"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: talker
+spec:
+  selector:
+    app: talker
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}

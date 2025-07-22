@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: listener
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: listener
+  template:
+    metadata:
+      labels:
+        app: listener
+    spec:
+      containers:
+        - name: listener
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["ros2", "run", "demo_nodes_cpp", "listener"]
+        - name: load-generator
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["python3", "/load/load_sim.py"]
+          env:
+            - name: MESSAGE_RATE
+              value: "{{ .Values.loadGenerator.messageRate }}"
+          volumeMounts:
+            - mountPath: /load
+              name: load
+      volumes:
+        - name: load
+          configMap:
+            name: load-sim-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-sim-config
+data:
+  load_sim.py: |
+    import os, rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
+    class Load(Node):
+        def __init__(self):
+            super().__init__('load_generator')
+            self.cli = self.create_client(String, 'load_topic')
+        
+    # Dummy script to publish messages
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: listener
+spec:
+  selector:
+    app: listener
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}

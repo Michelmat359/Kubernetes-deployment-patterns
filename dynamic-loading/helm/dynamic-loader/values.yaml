@@ -1,0 +1,6 @@
+replicaCount: 1
+image:
+  repository: ros
+  tag: humble
+api:
+  port: 5000

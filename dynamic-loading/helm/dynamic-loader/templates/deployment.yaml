@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-loader
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: dynamic-loader
+  template:
+    metadata:
+      labels:
+        app: dynamic-loader
+    spec:
+      containers:
+        - name: dynamic-host
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["python3", "/app/server.py"]
+          ports:
+            - containerPort: {{ .Values.api.port }}
+          volumeMounts:
+            - mountPath: /app
+              name: app-code
+      volumes:
+        - name: app-code
+          configMap:
+            name: loader-code
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loader-code
+data:
+  server.py: |
+    from fastapi import FastAPI
+    import os
+    app = FastAPI()
+
+    @app.get('/')
+    async def root():
+        return {'status': 'running'}
+
+    # Endpoint to load component - placeholder
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamic-loader
+spec:
+  selector:
+    app: dynamic-loader
+  ports:
+    - port: {{ .Values.api.port }}
+      targetPort: {{ .Values.api.port }}

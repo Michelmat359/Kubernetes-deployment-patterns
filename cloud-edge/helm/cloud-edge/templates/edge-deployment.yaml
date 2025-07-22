@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge-processing
+spec:
+  replicas: {{ .Values.edge.replicas }}
+  selector:
+    matchLabels:
+      app: edge-processing
+  template:
+    metadata:
+      labels:
+        app: edge-processing
+    spec:
+      nodeSelector:
+{{ toYaml .Values.edge.nodeSelector | indent 8 }}
+      containers:
+        - name: processor
+          image: ros:humble
+          command: ["ros2", "run", "demo_nodes_cpp", "listener"]
+        - name: load-generator
+          image: ros:humble
+          command: ["python3", "/load/load_sim.py"]
+          env:
+            - name: MESSAGE_RATE
+              value: "{{ .Values.loadGenerator.messageRate }}"
+          volumeMounts:
+            - mountPath: /load
+              name: load
+      volumes:
+        - name: load
+          configMap:
+            name: load-sim-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-sim-config
+data:
+  load_sim.py: |
+    import os, rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
+    class Load(Node):
+        def __init__(self):
+            super().__init__('load')
+            self.publisher_ = self.create_publisher(String, 'edge_load', 10)
+            rate = float(os.getenv('MESSAGE_RATE', '10'))
+            self.timer = self.create_timer(1.0 / rate, self.cb)
+        def cb(self):
+            self.publisher_.publish(String(data='edge'))
+    rclpy.init()
+    node = Load()
+    rclpy.spin(node)

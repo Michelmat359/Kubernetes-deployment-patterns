@@ -1,0 +1,4 @@
+apiVersion: v2
+name: ros2-microservices
+version: 0.1.0
+description: Microservices pattern for ROS 2
