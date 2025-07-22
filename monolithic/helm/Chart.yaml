@@ -1,4 +1,13 @@
 apiVersion: v2
 name: ros2-monolithic
-version: 0.1.0
-description: ROS 2 Monolithic pattern
+description: A Helm chart for a monolithic ROS 2 demo (talker+listener & load simulator)
+type: application
+version: 0.1.1
+appVersion: humble
+keywords:
+  - ros2
+  - monolithic
+  - robotics
+maintainers:
+  - name: Miguel-Angel-Mateo-Casali
+    email: mmateo@cigip.upv.es

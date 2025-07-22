@@ -1,6 +1,23 @@
 replicaCount: 1
+
 image:
-  repository: ros
-  tag: humble
+  repository: osrf/ros
+  tag: humble-desktop
+  pullPolicy: IfNotPresent
+
+loadSimulator:
+  messageRate: 10
+  scriptPath: load_sim.py
+
 api:
   port: 5000
+
+service:
+  type: ClusterIP
+  port: {{ .Values.api.port | default 8080 }}
+  targetPort: {{ .Values.api.port | default 8080 }}
+
+containerPort: {{ .Values.api.port | default 8080 }}
+
+nameOverride: ""
+fullnameOverride: ""
