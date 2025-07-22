@@ -1,7 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: listener
+  name: {{ include "ros2-microservices.fullname" . }}-listener
+  labels:
+    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -14,45 +17,23 @@ spec:
     spec:
       containers:
         - name: listener
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["ros2", "run", "demo_nodes_cpp", "listener"]
+          ports:
+            - containerPort: {{ .Values.containerPort }}
         - name: load-generator
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          command: ["python3", "/load/load_sim.py"]
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python3", "/scripts/{{ .Values.loadGenerator.scriptPath }}"]
           env:
             - name: MESSAGE_RATE
               value: "{{ .Values.loadGenerator.messageRate }}"
           volumeMounts:
-            - mountPath: /load
-              name: load
+            - name: load-sim
+              mountPath: /scripts/{{ .Values.loadGenerator.scriptPath }}
+              subPath: {{ .Values.loadGenerator.scriptPath }}
       volumes:
-        - name: load
+        - name: load-sim
           configMap:
-            name: load-sim-config
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: load-sim-config
-data:
-  load_sim.py: |
-    import os, rclpy
-    from rclpy.node import Node
-    from std_msgs.msg import String
-    class Load(Node):
-        def __init__(self):
-            super().__init__('load_generator')
-            self.cli = self.create_client(String, 'load_topic')
-        
-    # Dummy script to publish messages
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: listener
-spec:
-  selector:
-    app: listener
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
+            name: {{ include "ros2-microservices.fullname" . }}-load-sim

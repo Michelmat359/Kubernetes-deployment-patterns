@@ -1,7 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: talker
+  name: {{ include "ros2-microservices.fullname" . }}-talker
+  labels:
+    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -14,16 +17,8 @@ spec:
     spec:
       containers:
         - name: talker
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["ros2", "run", "demo_nodes_cpp", "talker"]
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: talker
-spec:
-  selector:
-    app: talker
-  ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
+          ports:
+            - containerPort: {{ .Values.containerPort }}
