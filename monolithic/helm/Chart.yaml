@@ -1,6 +1,6 @@
 apiVersion: v2
 name: ros2-monolithic
-description: A Helm chart for a monolithic ROS 2 demo (talker+listener & load simulator)
+description: A Helm chart for a monolithic ROS 2 demo (talker+listener & load simulator)
 type: application
 version: 0.1.1
 appVersion: humble
