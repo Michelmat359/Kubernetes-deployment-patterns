@@ -18,13 +18,17 @@ spec:
         - name: dynamic-host
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /app
+          env:
+            - name: PORT
+              value: "{{ .Values.api.port }}"
           command:
             - /ros_entrypoint.sh
             - bash
             - -lc
             - |
-            - pip install fastapi uvicorn && \
-            - python3 /app/server.py
+              pip install --no-cache-dir fastapi uvicorn && \
+              uvicorn server:app --host 0.0.0.0 --port $PORT
           ports:
             - containerPort: {{ .Values.api.port }}
           resources:
