@@ -1,0 +1,17 @@
+ai:
+  enabled: true
+  image: ghcr.io/tuorg/ros2-ai
+  tag: latest
+  replicaCount: 2
+
+sensor:
+  image: ghcr.io/tuorg/ros2-sensors
+  tag: latest
+
+control:
+  image: ghcr.io/tuorg/ros2-control
+  tag: latest
+
+bridge:
+  image: ghcr.io/tuorg/ros2-d2d-bridge
+  tag: latest

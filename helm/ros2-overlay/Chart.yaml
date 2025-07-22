@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ros2-overlay
+description: Base + overlay workspace pattern
+type: application
+version: 0.1.0
+appVersion: "humble"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ros2-microservices
+description: ROS 2 microservices split
+type: application
+version: 0.1.0
+appVersion: "humble"

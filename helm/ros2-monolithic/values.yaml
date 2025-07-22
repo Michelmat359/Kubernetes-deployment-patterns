@@ -1,0 +1,8 @@
+image:
+  repository: ghcr.io/tuorg/ros2-monolith
+  tag: humble
+  pullPolicy: IfNotPresent
+
+replicaCount: 1          # réplicas = número de robots simulados
+resources: {}            # añade límites si lo necesitas
+nodeSelector: {}         # p.ej. {"edge": "true"}
