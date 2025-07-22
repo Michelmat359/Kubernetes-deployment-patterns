@@ -3,8 +3,7 @@ kind: Deployment
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-talker
   labels:
-    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -20,7 +19,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /ros_entrypoint.sh   # ENTRYPOINT de la imagen original :contentReference[oaicite:0]{index=0}
+            - /ros_entrypoint.sh    # ENTRYPOINT de la imagen oficial
             - ros2
             - run
             - demo_nodes_cpp
