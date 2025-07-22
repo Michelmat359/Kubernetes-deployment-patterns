@@ -1,0 +1,9 @@
+replicaCount: 1
+image:
+  repository: ros
+  tag: humble
+loadGenerator:
+  messageRate: 10
+service:
+  type: ClusterIP
+  port: 8080

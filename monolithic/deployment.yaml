@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ros2-monolithic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ros2-monolithic
+  template:
+    metadata:
+      labels:
+        app: ros2-monolithic
+    spec:
+      containers:
+        - name: ros
+          image: ros:humble
+          command: ["ros2", "launch", "demo_nodes_cpp", "talker_listener.launch.py"]
+          env:
+            # Adjust message load via env vars
+            - name: MESSAGE_RATE
+              value: "10"
+          ports:
+            - containerPort: 8080
+        - name: load-simulator
+          image: ros:humble
+          command: ["python3", "/load/load_sim.py"]
+          env:
+            - name: MESSAGE_RATE
+              value: "10"
+          volumeMounts:
+            - mountPath: /load
+              name: load-sim
+      volumes:
+        - name: load-sim
+          configMap:
+            name: load-sim-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: load-sim-config
+data:
+  load_sim.py: |
+    import os, rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
+    class LoadSim(Node):
+        def __init__(self):
+            super().__init__('load_sim')
+            self.publisher_ = self.create_publisher(String, 'load_chatter', 10)
+            rate = float(os.getenv('MESSAGE_RATE', '10'))
+            self.timer = self.create_timer(1.0 / rate, self.timer_callback)
+        def timer_callback(self):
+            msg = String()
+            msg.data = 'load message'
+            self.publisher_.publish(msg)
+    rclpy.init()
+    node = LoadSim()
+    rclpy.spin(node)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ros2-monolithic
+spec:
+  selector:
+    app: ros2-monolithic
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: dynamic-loader
+version: 0.1.0
+description: ROS 2 dynamic composition with HTTP API
