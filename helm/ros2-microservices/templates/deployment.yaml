@@ -1,9 +1,0 @@
-{{ include "ros2-microservices.deployment" (dict "svc" .Values.sensor "name" "sensor" "$" $) }}
----
-{{ include "ros2-microservices.deployment" (dict "svc" .Values.control "name" "control" "$" $) }}
----
-{{- if .Values.ai.enabled }}
-{{ include "ros2-microservices.deployment" (dict "svc" .Values.ai "name" "ai" "$" $) }}
-{{- end }}
----
-{{ include "ros2-microservices.deployment" (dict "svc" .Values.bridge "name" "bridge" "$" $) }}
