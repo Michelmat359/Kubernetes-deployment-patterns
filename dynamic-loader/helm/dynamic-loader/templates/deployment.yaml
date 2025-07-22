@@ -1,54 +1,52 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: dynamic-loader
+  name: {{ include "dynamic-loader.fullname" . }}
+  labels:
+    {{- include "dynamic-loader.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: dynamic-loader
+      app: {{ include "dynamic-loader.name" . }}
   template:
     metadata:
       labels:
-        app: dynamic-loader
+        app: {{ include "dynamic-loader.name" . }}
     spec:
       containers:
         - name: dynamic-host
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-          command: ["python3", "/app/server.py"]
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /ros_entrypoint.sh
+            - python3
+            - /app/server.py
           ports:
             - containerPort: {{ .Values.api.port }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - mountPath: /app
-              name: app-code
+            - name: app-code
+              mountPath: /app
+            - name: modules
+              mountPath: /modules
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.api.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.api.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
       volumes:
         - name: app-code
           configMap:
-            name: loader-code
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: loader-code
-data:
-  server.py: |
-    from fastapi import FastAPI
-    import os
-    app = FastAPI()
-
-    @app.get('/')
-    async def root():
-        return {'status': 'running'}
-
-    # Endpoint to load component - placeholder
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dynamic-loader
-spec:
-  selector:
-    app: dynamic-loader
-  ports:
-    - port: {{ .Values.api.port }}
-      targetPort: {{ .Values.api.port }}
+            name: {{ include "dynamic-loader.fullname" . }}-code
+        - name: modules
+          emptyDir: {}
