@@ -40,19 +40,6 @@ spec:
               mountPath: /app
             - name: modules
               mountPath: /modules
-          readinessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.api.port }}
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: {{ .Values.api.port }}
-            initialDelaySeconds: 15
-            periodSeconds: 20
-
       volumes:
         - name: app-code
           configMap:
