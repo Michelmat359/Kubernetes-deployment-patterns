@@ -1,40 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cloud-edge.fullname" . }}-edge-processing
+  name: {{ include "ros2-microservices.fullname" . }}-listener
   labels:
-    {{- include "cloud-edge.labels" . | nindent 4 }}
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "{{ .Values.metrics.port }}"
+    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.edge.replicas }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: edge-processing
+      app: listener
   template:
     metadata:
       labels:
-        app: edge-processing
+        app: listener
     spec:
       containers:
-        - name: processor
+        - name: listener
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /ros_entrypoint.sh
-            - python3
-            - /scripts/listener.py
-          env:
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
+            - ros2
+            - run
+            - demo_nodes_cpp
+            - listener
           ports:
             - containerPort: {{ .Values.containerPort }}
-            - containerPort: {{ .Values.metrics.port }}
-          volumeMounts:
-            - name: listener-code
-              mountPath: /scripts/listener.py
-              subPath: listener.py
         - name: load-generator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -45,18 +37,11 @@ spec:
           env:
             - name: MESSAGE_RATE
               value: "{{ .Values.loadGenerator.messageRate }}"
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
-          ports:
-            - containerPort: {{ .Values.metrics.port }}
           volumeMounts:
             - name: load-sim
               mountPath: /scripts/{{ .Values.loadGenerator.scriptPath }}
               subPath: {{ .Values.loadGenerator.scriptPath }}
       volumes:
-        - name: listener-code
-          configMap:
-            name: {{ include "cloud-edge.fullname" . }}-listener-code
         - name: load-sim
           configMap:
-            name: {{ include "cloud-edge.fullname" . }}-load-sim
+            name: {{ include "ros2-microservices.fullname" . }}-load-sim
