@@ -2,7 +2,7 @@ apiVersion: v2
 name: dynamic-loader
 description: Helm chart for ROS 2 dynamic composition with FastAPI-based HTTP API
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: humble
 keywords:
   - ros2

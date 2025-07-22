@@ -20,8 +20,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /ros_entrypoint.sh
-            - python3
-            - /app/server.py
+            - bash
+            - -lc
+            - |
+            - pip install fastapi uvicorn && \
+            - python3 /app/server.py
           ports:
             - containerPort: {{ .Values.api.port }}
           resources:
