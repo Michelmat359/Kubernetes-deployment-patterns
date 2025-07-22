@@ -2,7 +2,7 @@ apiVersion: v2
 name: cloud-edge
 description: A Helm chart for Cloud‑Edge ROS 2 deployment (fleet manager in cloud, processing at edge)
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: humble
 keywords:
   - ros2

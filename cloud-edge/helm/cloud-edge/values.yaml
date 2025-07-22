@@ -6,12 +6,12 @@ image:
 cloud:
   replicas: 1
   nodeSelector:
-    kubernetes.io/hostname: cloud-node
+    role: cloud
 
 edge:
   replicas: 1
   nodeSelector:
-    kubernetes.io/hostname: edge-node
+    role: edge
 
 loadGenerator:
   messageRate: 10
