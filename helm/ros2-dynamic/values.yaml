@@ -1,5 +1,0 @@
-image: ghcr.io/tuorg/ros2-component-manager:latest
-
-plugins:
-  - nav_plugin
-  - ai_plugin           # nombre de la librería a load()

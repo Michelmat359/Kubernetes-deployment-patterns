@@ -1,4 +1,0 @@
-baseImage: ghcr.io/tuorg/ros2-base:humble
-overlay:
-  url: https://example.com/overlays/ai_model_ws.tar.gz
-  checksum: "sha256:deadbeef..."   # opcional
