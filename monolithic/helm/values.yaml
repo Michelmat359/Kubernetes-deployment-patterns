@@ -14,10 +14,11 @@ api:
 
 service:
   type: ClusterIP
-  port: {{ .Values.api.port | default 8080 }}
-  targetPort: {{ .Values.api.port | default 8080 }}
+  port: 5000
+  targetPort: 5000
 
-containerPort: {{ .Values.api.port | default 8080 }}
+containerPort: 5000
+
 
 nameOverride: ""
 fullnameOverride: ""
