@@ -1,21 +1,27 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: fleet-manager
+  name: {{ include "cloud-edge.fullname" . }}-fleet-manager
+  labels:
+    {{- include "cloud-edge.labels" . | nindent 4 }}
 spec:
+  type: {{ .Values.service.type }}
   selector:
     app: fleet-manager
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: edge-processing
+  name: {{ include "cloud-edge.fullname" . }}-edge-processing
+  labels:
+    {{- include "cloud-edge.labels" . | nindent 4 }}
 spec:
+  type: {{ .Values.service.type }}
   selector:
     app: edge-processing
   ports:
-    - port: 8080
-      targetPort: 8080
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

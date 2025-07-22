@@ -1,4 +1,13 @@
 apiVersion: v2
 name: cloud-edge
-version: 0.1.0
-description: Cloud-Edge ROS 2 deployment
+description: A Helm chart for Cloud‑Edge ROS 2 deployment (fleet manager in cloud, processing at edge)
+type: application
+version: 0.1.1
+appVersion: humble
+keywords:
+  - ros2
+  - cloud
+  - edge
+maintainers:
+  - name: Miguel-Angel-Mateo-Casali
+    email: mmateo@cigip.upv.es

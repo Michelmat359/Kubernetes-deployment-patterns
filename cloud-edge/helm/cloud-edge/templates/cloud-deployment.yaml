@@ -1,7 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: fleet-manager
+  name: {{ include "cloud-edge.fullname" . }}-fleet-manager
+  labels:
+    {{- include "cloud-edge.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.cloud.replicas }}
   selector:
@@ -16,5 +18,13 @@ spec:
 {{ toYaml .Values.cloud.nodeSelector | indent 8 }}
       containers:
         - name: manager
-          image: ros:humble
-          command: ["ros2", "run", "demo_nodes_cpp", "talker"]
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /ros_entrypoint.sh
+            - ros2
+            - run
+            - demo_nodes_cpp
+            - talker
+          ports:
+            - containerPort: {{ .Values.containerPort }}
