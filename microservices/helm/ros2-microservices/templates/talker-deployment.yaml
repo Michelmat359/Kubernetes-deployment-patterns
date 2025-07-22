@@ -19,6 +19,11 @@ spec:
         - name: talker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["ros2", "run", "demo_nodes_cpp", "talker"]
+          command:
+            - /ros_entrypoint.sh   # ENTRYPOINT de la imagen original :contentReference[oaicite:0]{index=0}
+            - ros2
+            - run
+            - demo_nodes_cpp
+            - talker
           ports:
             - containerPort: {{ .Values.containerPort }}
