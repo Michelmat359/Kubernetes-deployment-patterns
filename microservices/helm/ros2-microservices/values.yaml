@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: ros
-  tag: humble
+  repository: osrf/ros
+  tag: humble-desktop
   pullPolicy: IfNotPresent
 
 loadGenerator:

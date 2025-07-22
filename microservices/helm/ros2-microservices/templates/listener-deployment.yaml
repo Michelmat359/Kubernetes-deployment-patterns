@@ -19,13 +19,21 @@ spec:
         - name: listener
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["ros2", "run", "demo_nodes_cpp", "listener"]
+          command:
+            - /ros_entrypoint.sh
+            - ros2
+            - run
+            - demo_nodes_cpp
+            - listener
           ports:
             - containerPort: {{ .Values.containerPort }}
         - name: load-generator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["python3", "/scripts/{{ .Values.loadGenerator.scriptPath }}"]
+          command:
+            - /ros_entrypoint.sh
+            - python3
+            - /scripts/{{ .Values.loadGenerator.scriptPath }}
           env:
             - name: MESSAGE_RATE
               value: "{{ .Values.loadGenerator.messageRate }}"
