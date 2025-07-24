@@ -15,3 +15,7 @@ service:
   targetPort: 8080
 
 containerPort: 8080
+
+metrics:
+  enabled: true
+  port: 9090

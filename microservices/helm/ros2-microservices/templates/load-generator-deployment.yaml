@@ -1,40 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cloud-edge.fullname" . }}-edge-processing
+  name: {{ include "ros2-microservices.fullname" . }}-load-generator
   labels:
-    {{- include "cloud-edge.labels" . | nindent 4 }}
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "{{ .Values.metrics.port }}"
 spec:
-  replicas: {{ .Values.edge.replicas }}
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: edge-processing
+      app: load-generator
   template:
     metadata:
       labels:
-        app: edge-processing
+        app: load-generator
     spec:
       containers:
-        - name: processor
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /ros_entrypoint.sh
-            - python3
-            - /scripts/listener.py
-          env:
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
-          ports:
-            - containerPort: {{ .Values.containerPort }}
-            - containerPort: {{ .Values.metrics.port }}
-          volumeMounts:
-            - name: listener-code
-              mountPath: /scripts/listener.py
-              subPath: listener.py
         - name: load-generator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -54,9 +37,6 @@ spec:
               mountPath: /scripts/{{ .Values.loadGenerator.scriptPath }}
               subPath: {{ .Values.loadGenerator.scriptPath }}
       volumes:
-        - name: listener-code
-          configMap:
-            name: {{ include "cloud-edge.fullname" . }}-listener-code
         - name: load-sim
           configMap:
-            name: {{ include "cloud-edge.fullname" . }}-load-sim
+            name: {{ include "ros2-microservices.fullname" . }}-load-sim

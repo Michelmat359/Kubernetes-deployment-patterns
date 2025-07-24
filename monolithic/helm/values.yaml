@@ -12,6 +12,10 @@ loadSimulator:
 api:
   port: 5000
 
+loadGenerator:
+  messageRate: 10
+  scriptPath: load_sim.py
+
 service:
   type: ClusterIP
   port: 5000
@@ -19,6 +23,9 @@ service:
 
 containerPort: 5000
 
+metrics:
+  enabled: true
+  port: 9090
 
 nameOverride: ""
 fullnameOverride: ""
