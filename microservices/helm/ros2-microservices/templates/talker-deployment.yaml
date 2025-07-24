@@ -4,9 +4,6 @@ metadata:
   name: {{ include "ros2-microservices.fullname" . }}-talker
   labels:
     {{- include "ros2-microservices.labels" . | nindent 4 }}
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "{{ .Values.metrics.port }}"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -22,22 +19,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /ros_entrypoint.sh
-            - python3
-            - /scripts/talker.py
-          env:
-            - name: MESSAGE_RATE
-              value: "{{ .Values.loadGenerator.messageRate }}"
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
+            - /ros_entrypoint.sh    # ENTRYPOINT de la imagen oficial
+            - ros2
+            - run
+            - demo_nodes_cpp
+            - talker
           ports:
             - containerPort: {{ .Values.containerPort }}
-            - containerPort: {{ .Values.metrics.port }}
-          volumeMounts:
-            - name: talker-code
-              mountPath: /scripts/talker.py
-              subPath: talker.py
-      volumes:
-        - name: talker-code
-          configMap:
-            name: {{ include "ros2-microservices.fullname" . }}-talker-code

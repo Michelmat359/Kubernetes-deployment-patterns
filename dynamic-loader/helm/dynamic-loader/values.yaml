@@ -8,10 +8,6 @@ image:
 api:
   port: 5000
 
-metrics:
-  enabled: true
-  port: 9090
-
 resources:
   requests:
     cpu: 100m
@@ -20,6 +16,11 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# opcionales
-ameOverride: ""
+service:
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+
+nameOverride: ""
 fullnameOverride: ""
+

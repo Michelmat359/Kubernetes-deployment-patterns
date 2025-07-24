@@ -6,49 +6,27 @@ metadata:
     {{- include "dynamic-loader.labels" . | nindent 4 }}
 data:
   server.py: |
-    import os, sys, time, importlib.util
+    import os, sys
+    import importlib.util
     from fastapi import FastAPI, UploadFile, File, HTTPException
-    from prometheus_client import start_http_server, Gauge, Histogram
-    from starlette.middleware.base import BaseHTTPMiddleware
-
-    MODULE_LOAD = Gauge('dynamic_module_load_seconds', 'Time to load module')
-    HTTP_REQ_LATENCY = Histogram(
-        'http_request_duration_seconds',
-        'HTTP request latency',
-        ['endpoint', 'method', 'status']
-    )
+    from fastapi.responses import JSONResponse
+    import uvicorn
 
     app = FastAPI()
+    MODULES_DIR = "/modules"
 
-    # Middleware para medir latencia HTTP
-    @app.middleware('http')
-    async def metrics_middleware(request, call_next):
-        start = time.time()
-        response = await call_next(request)
-        duration = time.time() - start
-        labels = {
-            'endpoint': request.url.path,
-            'method': request.method,
-            'status': str(response.status_code)
-        }
-        HTTP_REQ_LATENCY.labels(**labels).observe(duration)
-        return response
+    os.makedirs(MODULES_DIR, exist_ok=True)
 
-    MODULE_DIR = '/modules'
-    os.makedirs(MODULE_DIR, exist_ok=True)
-
-    @app.get('/')
+    @app.get("/")
     async def root():
-        return {'status': 'running'}
+        return {"status": "running"}
 
-    @app.post('/modules/')
+    @app.post("/modules/")
     async def upload_module(name: str, file: UploadFile = File(...)):
-        dest = os.path.join(MODULE_DIR, name + '.py')
+        dest = os.path.join(MODULES_DIR, name + ".py")
         content = await file.read()
-        with open(dest, 'wb') as f:
+        with open(dest, "wb") as f:
             f.write(content)
-        # Cargar módulo en memoria y medir tiempo
-        start = time.time()
         spec = importlib.util.spec_from_file_location(name, dest)
         module = importlib.util.module_from_spec(spec)
         try:
@@ -56,27 +34,22 @@ data:
             sys.modules[name] = module
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-        MODULE_LOAD.observe(time.time() - start)
-        return {'status': 'loaded', 'module': name}
+        return {"status": "loaded", "module": name}
 
-    @app.get('/modules/')
+    @app.get("/modules/")
     async def list_modules():
-        files = [f[:-3] for f in os.listdir(MODULE_DIR) if f.endswith('.py')]
-        return {'modules': files}
+        files = [f[:-3] for f in os.listdir(MODULES_DIR) if f.endswith(".py")]
+        return {"modules": files}
 
-    @app.delete('/modules/{name}')
+    @app.delete("/modules/{name}")
     async def delete_module(name: str):
         if name not in sys.modules:
-            raise HTTPException(status_code=404, detail='Module not loaded')
+            raise HTTPException(status_code=404, detail="Module not loaded")
         sys.modules.pop(name)
-        path = os.path.join(MODULE_DIR, name + '.py')
+        path = os.path.join(MODULES_DIR, name + ".py")
         if os.path.exists(path):
             os.remove(path)
-        return {'status': 'unloaded', 'module': name}
+        return {"status": "unloaded", "module": name}
 
-    if __name__ == '__main__':
-        port = int(os.getenv('PORT', {{ .Values.api.port }}))
-        metrics_port = int(os.getenv('METRICS_PORT', {{ .Values.metrics.port }}))
-        start_http_server(metrics_port)
-        import uvicorn
-        uvicorn.run('server:app', host='0.0.0.0', port=port)
+    if __name__ == "__main__":
+        uvicorn.run("server:app", host="0.0.0.0", port=int(os.getenv("PORT", {{ .Values.api.port }})))

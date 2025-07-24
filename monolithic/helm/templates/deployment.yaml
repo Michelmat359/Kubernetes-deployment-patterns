@@ -4,9 +4,6 @@ metadata:
   name: {{ include "ros2-monolithic.fullname" . }}
   labels:
     {{- include "ros2-monolithic.labels" . | nindent 4 }}
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "{{ .Values.metrics.port }}"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -17,47 +14,38 @@ spec:
       labels:
         app: {{ include "ros2-monolithic.name" . }}
     spec:
-      initContainers:
-      - name: install-deps
-        image: { { .Values.image.repository } }:{{ .Values.image.tag }}
-        command:
-          - /bin/bash
-          - -lc
-          - |
-            apt-get update && \
-            apt-get install -y python3-pip && \
-            pip3 install prometheus_client && \
-            cp -a /usr/local/lib/python3.*/dist-packages /deps
-        volumeMounts:
-          - name: deps
-            mountPath: /deps
       containers:
-        - name: monolithic
+        - name: ros-app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /ros_entrypoint.sh
+            - ros2
+            - launch
+            - demo_nodes_cpp
+            - talker_listener.launch.py
+          env:
+            - name: MESSAGE_RATE
+              value: "{{ .Values.loadSimulator.messageRate }}"
+          ports:
+            - containerPort: {{ .Values.containerPort }}
+
+        - name: load-simulator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - /ros_entrypoint.sh
             - python3
-            - /app/monolithic.py
+            - /scripts/{{ .Values.loadSimulator.scriptPath }}
           env:
             - name: MESSAGE_RATE
-              value: "{{ .Values.metrics.rate | default .Values.messageRate }}"
-            - name: METRICS_PORT
-              value: "{{ .Values.metrics.port }}"
-          ports:
-            - name: api
-              containerPort: {{ .Values.containerPort }}
-            - name: metrics
-              containerPort: {{ .Values.metrics.port }}
+              value: "{{ .Values.loadSimulator.messageRate }}"
           volumeMounts:
-            - name: code
-              mountPath: /app
-            - name: deps
-              mountPath: /usr/local/lib/python3.8/dist-packages
+            - name: load-sim
+              mountPath: /scripts/{{ .Values.loadSimulator.scriptPath }}
+              subPath: {{ .Values.loadSimulator.scriptPath }}
+
       volumes:
-        - name: code
+        - name: load-sim
           configMap:
-            name: {{ include "ros2-monolithic.fullname" . }}-code
-            defaultMode: 0644
-        - name: deps
-          emptyDir: {}
+            name: {{ include "ros2-monolithic.fullname" . }}-load-sim

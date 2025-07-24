@@ -5,13 +5,9 @@ metadata:
   labels:
     {{- include "dynamic-loader.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type }}
   selector:
     app: {{ include "dynamic-loader.name" . }}
   ports:
-    - name: api
-      port: {{ .Values.api.port }}
-      targetPort: {{ .Values.api.port }}
-    - name: metrics
-      port: {{ .Values.metrics.port }}
-      targetPort: {{ .Values.metrics.port }}
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

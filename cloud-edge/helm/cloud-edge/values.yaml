@@ -1,5 +1,3 @@
-replicaCount: 1
-
 image:
   repository: osrf/ros
   tag: humble-desktop
@@ -7,9 +5,13 @@ image:
 
 cloud:
   replicas: 1
+  nodeSelector:
+    role: cloud
 
 edge:
   replicas: 1
+  nodeSelector:
+    role: edge
 
 loadGenerator:
   messageRate: 10
@@ -22,10 +24,5 @@ service:
 
 containerPort: 8080
 
-metrics:
-  enabled: true
-  port: 9090
-
-# Optional name overrides
-ameOverride: ""
+nameOverride: ""
 fullnameOverride: ""
