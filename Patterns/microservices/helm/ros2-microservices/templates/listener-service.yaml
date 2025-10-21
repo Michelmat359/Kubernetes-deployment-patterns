@@ -10,5 +10,5 @@ spec:
   selector:
     app: listener
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPort }}
+    - port: {{ .Values.service.listener.port }}
+      targetPort: {{ .Values.service.listener.targetPort }}
