@@ -1,3 +1,6 @@
+# values.yaml para Monolithic Pattern
+# Todos los componentes ROS 2 en un solo contenedor
+
 replicaCount: 1
 
 image:
@@ -5,26 +8,52 @@ image:
   tag: humble-desktop
   pullPolicy: IfNotPresent
 
+# Configuración ROS 2
+ros:
+  domainId: 42
+  rmwImplementation: rmw_fastrtps_cpp
+
+# Selector de nodo (puedes desplegarlo en cloud o edge)
+nodeSelector:
+  # Opción 1: Desplegar en cloud
+  kubernetes.io/hostname: kb2.cigip.upv.es
+  # Opción 2: Desplegar en edge (comentar línea anterior y descomentar esta)
+  # kubernetes.io/hostname: kb-edge01.cigip.upv.es
+
+# Load Simulator integrado
 loadSimulator:
+  enabled: true
   messageRate: 10
   scriptPath: load_sim.py
+  topic: load_chatter
 
-api:
-  port: 5000
+# Recursos del contenedor monolítico
+resources:
+  requests:
+    cpu: 300m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
 
-loadGenerator:
-  messageRate: 10
-  scriptPath: load_sim.py
-
+# Servicio Kubernetes
 service:
   type: ClusterIP
-  port: 5000
-  targetPort: 5000
+  port: 11311
+  targetPort: 11311
 
-containerPort: 5000
+# Configuración de la aplicación ROS 2
+application:
+  # Launch file que ejecuta múltiples nodos
+  launchPackage: demo_nodes_cpp
+  launchFile: talker_listener.launch.py
+  # Para tu aplicación real:
+  # launchPackage: your_package
+  # launchFile: your_launch.py
 
-metrics:
-  enabled: true
+# Monitoring (opcional)
+monitoring:
+  enabled: false
   port: 9090
 
 nameOverride: ""

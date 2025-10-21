@@ -1,17 +1,78 @@
-replicaCount: 1
+# values.yaml para Microservices Pattern
+# Cada nodo ROS 2 como un servicio independiente
 
 image:
   repository: osrf/ros
   tag: humble-desktop
   pullPolicy: IfNotPresent
 
+# Configuración ROS 2 global
+ros:
+  domainId: 42
+  rmwImplementation: rmw_fastrtps_cpp
+
+# Microservicio: Talker (Publisher)
+talker:
+  enabled: true
+  replicaCount: 1
+  nodeSelector:
+    # Desplegar en cloud
+    kubernetes.io/hostname: kb2.cigip.upv.es
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  component:
+    package: demo_nodes_cpp
+    executable: talker
+    # Para tu aplicación:
+    # package: your_package
+    # executable: your_publisher_node
+
+# Microservicio: Listener (Subscriber)
+listener:
+  enabled: true
+  replicaCount: 1
+  nodeSelector:
+    # Desplegar en edge
+    kubernetes.io/hostname: kb-edge01.cigip.upv.es
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  component:
+    package: demo_nodes_cpp
+    executable: listener
+
+# Load Generator
 loadGenerator:
+  enabled: true
+  # El load generator se despliega con el listener (sidecar)
   messageRate: 10
   scriptPath: load_sim.py
+  topic: load_topic
 
+# Servicios
 service:
   type: ClusterIP
-  port: 8080
-  targetPort: 8080
+  talker:
+    port: 11311
+    targetPort: 11311
+  listener:
+    port: 11312
+    targetPort: 11312
 
-containerPort: 8080
+# Networking
+networking:
+  # Configuración para permitir DDS discovery entre pods
+  hostNetwork: false
+  dnsPolicy: ClusterFirst
+
+nameOverride: ""
+fullnameOverride: ""

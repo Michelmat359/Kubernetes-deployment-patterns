@@ -6,50 +6,197 @@ metadata:
     {{- include "dynamic-loader.labels" . | nindent 4 }}
 data:
   server.py: |
-    import os, sys
+    """
+    FastAPI Server for Dynamic Module Loading
+    Permite cargar módulos Python dinámicamente vía HTTP API
+    """
+    import os
+    import sys
     import importlib.util
+    import logging
+    from typing import List
     from fastapi import FastAPI, UploadFile, File, HTTPException
     from fastapi.responses import JSONResponse
     import uvicorn
 
-    app = FastAPI()
-    MODULES_DIR = "/modules"
+    # Configuración
+    MODULES_DIR = os.getenv("MODULES_DIR", "/modules")
+    VALIDATE_MODULES = os.getenv("VALIDATE_MODULES", "false").lower() == "true"
+    ALLOWED_MODULES = os.getenv("ALLOWED_MODULES", "").split(",")
 
+    # Logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("dynamic-loader")
+
+    # FastAPI app
+    app = FastAPI(
+        title="ROS 2 Dynamic Module Loader",
+        description="API para cargar módulos Python dinámicamente en sistema ROS 2",
+        version="1.0.0"
+    )
+
+    # Crear directorio de módulos
     os.makedirs(MODULES_DIR, exist_ok=True)
+    logger.info(f"Modules directory: {MODULES_DIR}")
 
     @app.get("/")
     async def root():
-        return {"status": "running"}
+        """Health check endpoint"""
+        return {
+            "status": "running",
+            "service": "dynamic-module-loader",
+            "modules_loaded": len([m for m in sys.modules.keys() if not m.startswith("_")])
+        }
+
+    @app.get("/health")
+    async def health():
+        """Detailed health check"""
+        return {
+            "status": "healthy",
+            "modules_dir": MODULES_DIR,
+            "modules_count": len(os.listdir(MODULES_DIR)),
+            "validation_enabled": VALIDATE_MODULES
+        }
 
     @app.post("/modules/")
     async def upload_module(name: str, file: UploadFile = File(...)):
-        dest = os.path.join(MODULES_DIR, name + ".py")
-        content = await file.read()
-        with open(dest, "wb") as f:
-            f.write(content)
-        spec = importlib.util.spec_from_file_location(name, dest)
-        module = importlib.util.module_from_spec(spec)
+        """
+        Carga un módulo Python dinámicamente
+        
+        Args:
+            name: Nombre del módulo (sin extensión .py)
+            file: Archivo Python a cargar
+        """
+        # Validación de nombre
+        if VALIDATE_MODULES and ALLOWED_MODULES:
+            if name not in ALLOWED_MODULES:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Module '{name}' not in allowed list"
+                )
+        
+        # Validar extensión del archivo
+        if not file.filename.endswith('.py'):
+            raise HTTPException(
+                status_code=400,
+                detail="Only .py files are allowed"
+            )
+        
+        dest_path = os.path.join(MODULES_DIR, f"{name}.py")
+        
         try:
+            # Guardar archivo
+            content = await file.read()
+            with open(dest_path, "wb") as f:
+                f.write(content)
+            
+            logger.info(f"Saved module to {dest_path}")
+            
+            # Cargar módulo
+            spec = importlib.util.spec_from_file_location(name, dest_path)
+            if spec is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not load spec for module '{name}'"
+                )
+            
+            module = importlib.util.module_from_spec(spec)
+            
+            # Si ya existe, recargar
+            if name in sys.modules:
+                logger.info(f"Reloading existing module '{name}'")
+                sys.modules.pop(name)
+            
+            # Ejecutar módulo
             spec.loader.exec_module(module)
             sys.modules[name] = module
+            
+            logger.info(f"Successfully loaded module '{name}'")
+            
+            return {
+                "status": "loaded",
+                "module": name,
+                "path": dest_path,
+                "size_bytes": len(content)
+            }
+            
         except Exception as e:
+            logger.error(f"Error loading module '{name}': {str(e)}")
+            # Limpiar archivo si falla la carga
+            if os.path.exists(dest_path):
+                os.remove(dest_path)
             raise HTTPException(status_code=400, detail=str(e))
-        return {"status": "loaded", "module": name}
 
     @app.get("/modules/")
     async def list_modules():
-        files = [f[:-3] for f in os.listdir(MODULES_DIR) if f.endswith(".py")]
-        return {"modules": files}
+        """Lista todos los módulos disponibles"""
+        try:
+            files = [
+                f[:-3] for f in os.listdir(MODULES_DIR) 
+                if f.endswith(".py") and not f.startswith("_")
+            ]
+            loaded = [m for m in files if m in sys.modules]
+            
+            return {
+                "modules": files,
+                "loaded": loaded,
+                "count": len(files)
+            }
+        except Exception as e:
+            logger.error(f"Error listing modules: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/modules/{name}")
+    async def get_module_info(name: str):
+        """Obtiene información de un módulo específico"""
+        module_path = os.path.join(MODULES_DIR, f"{name}.py")
+        
+        if not os.path.exists(module_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Module '{name}' not found"
+            )
+        
+        is_loaded = name in sys.modules
+        
+        stat = os.stat(module_path)
+        
+        return {
+            "name": name,
+            "path": module_path,
+            "loaded": is_loaded,
+            "size_bytes": stat.st_size,
+            "modified": stat.st_mtime
+        }
 
     @app.delete("/modules/{name}")
     async def delete_module(name: str):
-        if name not in sys.modules:
-            raise HTTPException(status_code=404, detail="Module not loaded")
-        sys.modules.pop(name)
-        path = os.path.join(MODULES_DIR, name + ".py")
-        if os.path.exists(path):
-            os.remove(path)
-        return {"status": "unloaded", "module": name}
+        """Descarga y elimina un módulo"""
+        # Descargar de sys.modules
+        if name in sys.modules:
+            sys.modules.pop(name)
+            logger.info(f"Unloaded module '{name}' from memory")
+        
+        # Eliminar archivo
+        module_path = os.path.join(MODULES_DIR, f"{name}.py")
+        if os.path.exists(module_path):
+            os.remove(module_path)
+            logger.info(f"Deleted module file '{module_path}'")
+            return {
+                "status": "deleted",
+                "module": name
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Module '{name}' not found"
+            )
 
     if __name__ == "__main__":
-        uvicorn.run("server:app", host="0.0.0.0", port=int(os.getenv("PORT", {{ .Values.api.port }})))
+        port = int(os.getenv("PORT", {{ .Values.api.port }}))
+        uvicorn.run(
+            "server:app",
+            host="0.0.0.0",
+            port=port,
+            log_level="info"
+        )

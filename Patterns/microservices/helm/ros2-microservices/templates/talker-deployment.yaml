@@ -1,28 +1,107 @@
+{{- if .Values.talker.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-talker
   labels:
     {{- include "ros2-microservices.labels" . | nindent 4 }}
+    microservice: talker
+    tier: publisher
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.talker.replicaCount }}
   selector:
     matchLabels:
       app: talker
+      microservice: talker
   template:
     metadata:
       labels:
         app: talker
+        microservice: talker
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.talker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.talker.nodeSelector | nindent 8 }}
+      {{- end }}
+      hostNetwork: {{ .Values.networking.hostNetwork }}
+      dnsPolicy: {{ .Values.networking.dnsPolicy }}
       containers:
         - name: talker
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ROS_DOMAIN_ID
+              value: "{{ .Values.ros.domainId }}"
+            - name: RMW_IMPLEMENTATION
+              value: "{{ .Values.ros.rmwImplementation }}"
+            - name: ROS_LOCALHOST_ONLY
+              value: "0"  # Permitir comunicación entre pods
+            - name: FASTRTPS_DEFAULT_PROFILES_FILE
+              value: "/tmp/fastdds.xml"
+            - name: NODE_NAME
+              value: "talker_microservice"
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           command:
-            - /ros_entrypoint.sh    # ENTRYPOINT de la imagen oficial
-            - ros2
-            - run
-            - demo_nodes_cpp
-            - talker
+            - /bin/bash
+            - -c
+            - |
+              # Configurar FastDDS para descubrimiento multi-pod
+              cat > /tmp/fastdds.xml <<EOF
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                  <participant profile_name="participant_profile" is_default_profile="true">
+                      <rtps>
+                          <builtin>
+                              <discovery_config>
+                                  <discoveryProtocol>SIMPLE</discoveryProtocol>
+                                  <leaseDuration>
+                                      <sec>20</sec>
+                                  </leaseDuration>
+                              </discovery_config>
+                          </builtin>
+                      </rtps>
+                  </participant>
+              </profiles>
+              EOF
+              
+              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
+              echo "==================================="
+              echo "Talker Microservice Starting..."
+              echo "Pod IP: \$POD_IP"
+              echo "Domain ID: {{ .Values.ros.domainId }}"
+              echo "==================================="
+              
+              ros2 run {{ .Values.talker.component.package }} {{ .Values.talker.component.executable }}
           ports:
-            - containerPort: {{ .Values.containerPort }}
+            - name: ros-dds
+              containerPort: 7400
+              protocol: UDP
+            - name: ros-discovery
+              containerPort: 7401
+              protocol: UDP
+          resources:
+            {{- toYaml .Values.talker.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "ros2 node list | grep -q talker || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "ros2 node list | grep -q talker || exit 1"
+            initialDelaySeconds: 15
+            periodSeconds: 5
+      restartPolicy: Always
+{{- end }}

@@ -4,48 +4,118 @@ metadata:
   name: {{ include "ros2-monolithic.fullname" . }}
   labels:
     {{- include "ros2-monolithic.labels" . | nindent 4 }}
+    pattern: monolithic
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: {{ include "ros2-monolithic.name" . }}
+      pattern: monolithic
   template:
     metadata:
       labels:
         app: {{ include "ros2-monolithic.name" . }}
+        pattern: monolithic
+        {{- include "ros2-monolithic.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
       containers:
-        - name: ros-app
+        # Contenedor principal: Aplicación ROS 2 monolítica
+        - name: ros-monolithic-app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /ros_entrypoint.sh
-            - ros2
-            - launch
-            - demo_nodes_cpp
-            - talker_listener.launch.py
           env:
-            - name: MESSAGE_RATE
-              value: "{{ .Values.loadSimulator.messageRate }}"
+            - name: ROS_DOMAIN_ID
+              value: "{{ .Values.ros.domainId }}"
+            - name: RMW_IMPLEMENTATION
+              value: "{{ .Values.ros.rmwImplementation }}"
+            - name: ROS_LOCALHOST_ONLY
+              value: "1"  # En monolítico, todos los nodos están en el mismo proceso
+            - name: NODE_NAME
+              value: "monolithic_app"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
+              echo "==================================="
+              echo "Starting Monolithic ROS 2 Application"
+              echo "Launch: {{ .Values.application.launchPackage }}/{{ .Values.application.launchFile }}"
+              echo "==================================="
+              
+              # Ejecutar el launch file que inicia múltiples nodos
+              ros2 launch {{ .Values.application.launchPackage }} {{ .Values.application.launchFile }}
           ports:
-            - containerPort: {{ .Values.containerPort }}
+            - name: ros-dds
+              containerPort: 7400
+              protocol: UDP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "ros2 node list | wc -l | grep -qE '^[1-9]' || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - "ros2 node list | wc -l | grep -qE '^[1-9]' || exit 1"
+            initialDelaySeconds: 20
+            periodSeconds: 10
 
+        {{- if .Values.loadSimulator.enabled }}
+        # Contenedor sidecar: Load Simulator
         - name: load-simulator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /ros_entrypoint.sh
-            - python3
-            - /scripts/{{ .Values.loadSimulator.scriptPath }}
           env:
+            - name: ROS_DOMAIN_ID
+              value: "{{ .Values.ros.domainId }}"
+            - name: RMW_IMPLEMENTATION
+              value: "{{ .Values.ros.rmwImplementation }}"
+            - name: ROS_LOCALHOST_ONLY
+              value: "1"
             - name: MESSAGE_RATE
               value: "{{ .Values.loadSimulator.messageRate }}"
+            - name: TOPIC_NAME
+              value: "{{ .Values.loadSimulator.topic }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
+              # Esperar a que el nodo principal esté listo
+              echo "Waiting for main ROS 2 nodes to start..."
+              sleep 10
+              echo "Starting Load Simulator..."
+              python3 /scripts/{{ .Values.loadSimulator.scriptPath }}
           volumeMounts:
             - name: load-sim
-              mountPath: /scripts/{{ .Values.loadSimulator.scriptPath }}
-              subPath: {{ .Values.loadSimulator.scriptPath }}
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        {{- end }}
 
       volumes:
+        {{- if .Values.loadSimulator.enabled }}
         - name: load-sim
           configMap:
             name: {{ include "ros2-monolithic.fullname" . }}-load-sim
+            defaultMode: 0755
+        {{- end }}
+      restartPolicy: Always

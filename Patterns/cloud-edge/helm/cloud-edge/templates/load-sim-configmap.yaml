@@ -1,3 +1,5 @@
+
+{{- if .Values.loadGenerator.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,33 +9,71 @@ metadata:
 data:
   {{ .Values.loadGenerator.scriptPath }}: |
     #!/usr/bin/env python3
-    import os, rclpy
+    """
+    Load Generator for Edge Processing
+    Simula carga de trabajo publicando mensajes a un rate configurable
+    """
+    import os
+    import sys
+    import time
+    import rclpy
     from rclpy.node import Node
     from std_msgs.msg import String
-
-    class Load(Node):
+    
+    class LoadGenerator(Node):
         def __init__(self):
-            super().__init__('load')
-            self.pub = self.create_publisher(String, 'edge_load', 10)
-            rate = float(os.getenv('MESSAGE_RATE', '10'))
-            self.timer = self.create_timer(1.0 / rate, self.cb)
-
-        def cb(self):
+            super().__init__('load_generator_edge')
+            
+            # Configuración desde variables de entorno
+            self.rate_hz = float(os.getenv('MESSAGE_RATE', '10'))
+            self.topic_name = os.getenv('TOPIC_NAME', 'edge_load')
+            
+            # Crear publicador
+            self.publisher = self.create_publisher(
+                String, 
+                self.topic_name, 
+                10
+            )
+            
+            # Crear timer
+            self.timer = self.create_timer(
+                1.0 / self.rate_hz, 
+                self.publish_message
+            )
+            
+            self.counter = 0
+            self.get_logger().info(
+                f'Load Generator iniciado - Publicando a {self.rate_hz} Hz en topic "{self.topic_name}"'
+            )
+        
+        def publish_message(self):
             msg = String()
-            msg.data = 'edge load message'
-            self.pub.publish(msg)
-            self.get_logger().info(f'Published: "{msg.data}"')
-
-    def main():
-        rclpy.init()
-        node = Load()
+            timestamp = self.get_clock().now().to_msg()
+            msg.data = f'Edge load message #{self.counter} - Time: {timestamp.sec}.{timestamp.nanosec}'
+            
+            self.publisher.publish(msg)
+            self.counter += 1
+            
+            # Log cada 100 mensajes para no saturar
+            if self.counter % 100 == 0:
+                self.get_logger().info(
+                    f'Published {self.counter} messages to "{self.topic_name}"'
+                )
+    
+    def main(args=None):
+        rclpy.init(args=args)
+        
         try:
+            node = LoadGenerator()
             rclpy.spin(node)
         except KeyboardInterrupt:
-            pass
+            print('\nShutting down load generator...')
+        except Exception as e:
+            print(f'Error: {e}', file=sys.stderr)
         finally:
-            node.destroy_node()
-            rclpy.shutdown()
-
+            if rclpy.ok():
+                rclpy.shutdown()
+    
     if __name__ == '__main__':
         main()
+{{- end }}

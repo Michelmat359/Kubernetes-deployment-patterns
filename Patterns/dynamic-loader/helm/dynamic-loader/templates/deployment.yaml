@@ -4,45 +4,134 @@ metadata:
   name: {{ include "dynamic-loader.fullname" . }}
   labels:
     {{- include "dynamic-loader.labels" . | nindent 4 }}
+    pattern: dynamic-loader
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: {{ include "dynamic-loader.name" . }}
+      pattern: dynamic-loader
   template:
     metadata:
       labels:
         app: {{ include "dynamic-loader.name" . }}
+        pattern: dynamic-loader
+        {{- include "dynamic-loader.labels" . | nindent 8 }}
     spec:
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Init container para instalar dependencias Python
+        - name: install-deps
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Installing Python dependencies..."
+              apt-get update -qq
+              apt-get install -y -qq python3-pip
+              python3 -m pip install --no-cache-dir \
+                fastapi==0.104.1 \
+                uvicorn[standard]==0.24.0 \
+                python-multipart==0.0.6
+              echo "Dependencies installed successfully"
+          volumeMounts:
+            - name: pip-cache
+              mountPath: /root/.cache/pip
       containers:
         - name: dynamic-host
+          {{- if .Values.baseImageCustom.enabled }}
+          image: "{{ .Values.baseImageCustom.repository }}:{{ .Values.baseImageCustom.tag }}"
+          {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           workingDir: /app
           env:
+            - name: ROS_DOMAIN_ID
+              value: "{{ .Values.ros.domainId }}"
+            - name: RMW_IMPLEMENTATION
+              value: "{{ .Values.ros.rmwImplementation }}"
+            - name: ROS_LOCALHOST_ONLY
+              value: "1"
             - name: PORT
               value: "{{ .Values.api.port }}"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            {{- if .Values.security.validateModules }}
+            - name: VALIDATE_MODULES
+              value: "true"
+            - name: ALLOWED_MODULES
+              value: {{ .Values.security.allowedModuleNames | join "," | quote }}
+            {{- end }}
           command:
-            - /ros_entrypoint.sh
-            - bash
-            - -lc
+            - /bin/bash
+            - -c
             - |
-             apt-get update && \
-             apt-get install -y python3-pip && \
-             python3 -m pip install --no-cache-dir fastapi uvicorn && \
-             python3 -m uvicorn server:app --host 0.0.0.0 --port $PORT
+              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
+              
+              # Reinstalar dependencias (workaround si initContainer no comparte filesystem)
+              if ! python3 -c "import fastapi" 2>/dev/null; then
+                echo "Installing FastAPI dependencies..."
+                apt-get update -qq && apt-get install -y -qq python3-pip
+                python3 -m pip install --no-cache-dir fastapi uvicorn python-multipart
+              fi
+              
+              echo "==================================="
+              echo "Dynamic Module Loader API Starting"
+              echo "Port: $PORT"
+              echo "Modules directory: /modules"
+              echo "==================================="
+              
+              # Iniciar servidor FastAPI
+              cd /app
+              python3 -m uvicorn server:app --host 0.0.0.0 --port $PORT --log-level info
           ports:
-            - containerPort: {{ .Values.api.port }}
+            - name: http-api
+              containerPort: {{ .Values.api.port }}
+              protocol: TCP
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: app-code
               mountPath: /app
+            {{- if .Values.persistence.enabled }}
+            - name: modules-storage
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- else }}
             - name: modules
               mountPath: /modules
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-api
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-api
+            initialDelaySeconds: 10
+            periodSeconds: 5
       volumes:
         - name: app-code
           configMap:
             name: {{ include "dynamic-loader.fullname" . }}-code
+        - name: pip-cache
+          emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: modules-storage
+          persistentVolumeClaim:
+            claimName: {{ include "dynamic-loader.fullname" . }}-modules
+        {{- else }}
         - name: modules
           emptyDir: {}
+        {{- end }}
+      restartPolicy: Always
