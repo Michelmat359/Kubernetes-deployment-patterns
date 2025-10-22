@@ -2,7 +2,7 @@ apiVersion: v2
 name: ros2-microservices
 description: A Helm chart implementing a microservices pattern for ROS 2 (listener, talker & load generator)
 type: application
-version: 1.0.2
+version: 1.0.3
 appVersion: humble
 keywords:
   - ros2

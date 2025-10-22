@@ -16,8 +16,8 @@ talker:
   enabled: true
   replicaCount: 1
   nodeSelector:
-    # Desplegar en cloud
-    kubernetes.io/hostname: kb2.cigip.upv.es
+    role: edge
+    kubernetes.io/hostname: kb-edge01
   resources:
     requests:
       cpu: 100m
@@ -37,8 +37,8 @@ listener:
   enabled: true
   replicaCount: 1
   nodeSelector:
-    # Desplegar en edge
-    kubernetes.io/hostname: kb-edge01.cigip.upv.es
+    role: cloud
+    kubernetes.io/hostname: kb2
   resources:
     requests:
       cpu: 100m
