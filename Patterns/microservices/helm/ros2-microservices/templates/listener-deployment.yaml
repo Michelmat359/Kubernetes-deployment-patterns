@@ -23,21 +23,38 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      # POD-LEVEL security (NO root)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
       nodeSelector:
         {{- toYaml .Values.listener.nodeSelector | nindent 8 }}
       affinity:
         {{- toYaml .Values.listener.affinity | nindent 8 }}
       tolerations:
         {{- toYaml .Values.listener.tolerations | nindent 8 }}
+
       volumes:
         - name: load-sim
           configMap:
             name: {{ include "ros2-microservices.fullname" . }}-load-sim
             defaultMode: 0755
+
       containers:
         - name: listener
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          # CONTAINER security: permitir escritura en /tmp para fastdds.xml
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
           command: ["/bin/bash","-lc"]
           args:
             - |
@@ -61,6 +78,7 @@ spec:
               echo "Pod IP: ${POD_IP}"
               echo "Domain ID: ${ROS_DOMAIN_ID}"
               ros2 run demo_nodes_cpp listener
+
           env:
             - name: ROS_DOMAIN_ID
               value: {{ .Values.commonEnv.ROS_DOMAIN_ID | quote }}
@@ -72,6 +90,7 @@ spec:
               value: /tmp/fastdds.xml
             - name: POD_IP
               valueFrom: { fieldRef: { fieldPath: status.podIP } }
+
           ports:
             - name: dds-discovery
               containerPort: 7400
@@ -79,12 +98,10 @@ spec:
             - name: dds-user
               containerPort: 7401
               protocol: UDP
+
           resources:
             {{- toYaml .Values.resources.listener | nindent 12 }}
-          securityContext:
-            runAsNonRoot: true
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
+
           {{- if .Values.listener.livenessProbe.enabled }}
           livenessProbe:
             exec:
@@ -93,6 +110,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
           {{- end }}
+
           {{- if .Values.listener.readinessProbe.enabled }}
           readinessProbe:
             exec:
@@ -105,12 +123,18 @@ spec:
         - name: load-generator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+
           command: ["/bin/bash","-lc"]
           args:
             - |
               source /opt/ros/humble/setup.bash
               echo "Starting Load Generator..."
               python3 /scripts/load_sim.py
+
           env:
             - name: ROS_DOMAIN_ID
               value: {{ .Values.commonEnv.ROS_DOMAIN_ID | quote }}
@@ -122,13 +146,11 @@ spec:
               value: {{ .Values.listener.loadGenerator.messageRate | quote }}
             - name: TOPIC_NAME
               value: {{ .Values.listener.loadGenerator.topicName | quote }}
+
           volumeMounts:
             - name: load-sim
               mountPath: /scripts
+
           resources:
             {{- toYaml .Values.resources.loadGenerator | nindent 12 }}
-          securityContext:
-            runAsNonRoot: true
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
         {{- end }}
