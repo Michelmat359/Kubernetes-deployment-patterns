@@ -1,143 +1,134 @@
-{{- if .Values.listener.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-listener
   labels:
     {{- include "ros2-microservices.labels" . | nindent 4 }}
+    app: listener
     microservice: listener
-    tier: subscriber
 spec:
-  replicas: {{ .Values.listener.replicaCount }}
+  replicas: 1
   selector:
     matchLabels:
       app: listener
-      microservice: listener
+      app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
+        {{- include "ros2-microservices.labels" . | nindent 8 }}
         app: listener
         microservice: listener
-        {{- include "ros2-microservices.labels" . | nindent 8 }}
     spec:
-      {{- if .Values.listener.nodeSelector }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
         {{- toYaml .Values.listener.nodeSelector | nindent 8 }}
-      {{- end }}
-      hostNetwork: {{ .Values.networking.hostNetwork }}
-      dnsPolicy: {{ .Values.networking.dnsPolicy }}
-      containers:
-        # Contenedor principal: Listener
-        - name: listener
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: ROS_DOMAIN_ID
-              value: "{{ .Values.ros.domainId }}"
-            - name: RMW_IMPLEMENTATION
-              value: "{{ .Values.ros.rmwImplementation }}"
-            - name: ROS_LOCALHOST_ONLY
-              value: "0"
-            - name: FASTRTPS_DEFAULT_PROFILES_FILE
-              value: "/tmp/fastdds.xml"
-            - name: NODE_NAME
-              value: "listener_microservice"
-            - name: POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-          command:
-            - /bin/bash
-            - -c
-            - |
-              cat > /tmp/fastdds.xml <<EOF
-              <?xml version="1.0" encoding="UTF-8" ?>
-              <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-                  <participant profile_name="participant_profile" is_default_profile="true">
-                      <rtps>
-                          <builtin>
-                              <discovery_config>
-                                  <discoveryProtocol>SIMPLE</discoveryProtocol>
-                                  <leaseDuration>
-                                      <sec>20</sec>
-                                  </leaseDuration>
-                              </discovery_config>
-                          </builtin>
-                      </rtps>
-                  </participant>
-              </profiles>
-              EOF
-              
-              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
-              echo "==================================="
-              echo "Listener Microservice Starting..."
-              echo "Pod IP: \$POD_IP"
-              echo "Domain ID: {{ .Values.ros.domainId }}"
-              echo "==================================="
-              
-              ros2 run {{ .Values.listener.component.package }} {{ .Values.listener.component.executable }}
-          ports:
-            - name: ros-dds
-              containerPort: 7400
-              protocol: UDP
-            - name: ros-discovery
-              containerPort: 7401
-              protocol: UDP
-          resources:
-            {{- toYaml .Values.listener.resources | nindent 12 }}
-          livenessProbe:
-            exec:
-              command:
-                - /bin/bash
-                - -c
-                - "ros2 node list | grep -q listener || exit 1"
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-
-        {{- if .Values.loadGenerator.enabled }}
-        # Contenedor sidecar: Load Generator
-        - name: load-generator
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          env:
-            - name: ROS_DOMAIN_ID
-              value: "{{ .Values.ros.domainId }}"
-            - name: RMW_IMPLEMENTATION
-              value: "{{ .Values.ros.rmwImplementation }}"
-            - name: ROS_LOCALHOST_ONLY
-              value: "0"
-            - name: MESSAGE_RATE
-              value: "{{ .Values.loadGenerator.messageRate }}"
-            - name: TOPIC_NAME
-              value: "{{ .Values.loadGenerator.topic }}"
-          command:
-            - /bin/bash
-            - -c
-            - |
-              source /opt/ros/{{ .Chart.AppVersion }}/setup.bash
-              sleep 5  # Esperar a que listener esté listo
-              echo "Starting Load Generator..."
-              python3 /scripts/{{ .Values.loadGenerator.scriptPath }}
-          volumeMounts:
-            - name: load-sim
-              mountPath: /scripts
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-        {{- end }}
-
+      affinity:
+        {{- toYaml .Values.listener.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.listener.tolerations | nindent 8 }}
       volumes:
-        {{- if .Values.loadGenerator.enabled }}
         - name: load-sim
           configMap:
             name: {{ include "ros2-microservices.fullname" . }}-load-sim
             defaultMode: 0755
+      containers:
+        - name: listener
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              cat > /tmp/fastdds.xml <<EOF
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+                <participant profile_name="participant_profile" is_default_profile="true">
+                  <rtps>
+                    <builtin>
+                      <discovery_config>
+                        <discoveryProtocol>SIMPLE</discoveryProtocol>
+                        <leaseDuration><sec>20</sec></leaseDuration>
+                      </discovery_config>
+                    </builtin>
+                  </rtps>
+                </participant>
+              </profiles>
+              EOF
+              source /opt/ros/humble/setup.bash
+              echo "=== Listener Microservice Starting ==="
+              echo "Pod IP: ${POD_IP}"
+              echo "Domain ID: ${ROS_DOMAIN_ID}"
+              ros2 run demo_nodes_cpp listener
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.commonEnv.ROS_DOMAIN_ID | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.commonEnv.RMW_IMPLEMENTATION | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.commonEnv.ROS_LOCALHOST_ONLY | quote }}
+            - name: FASTRTPS_DEFAULT_PROFILES_FILE
+              value: /tmp/fastdds.xml
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          ports:
+            - name: dds-discovery
+              containerPort: 7400
+              protocol: UDP
+            - name: dds-user
+              containerPort: 7401
+              protocol: UDP
+          resources:
+            {{- toYaml .Values.resources.listener | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          {{- if .Values.listener.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command: ["/bin/bash","-lc","ros2 node list | grep -q listener || exit 1"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          {{- end }}
+          {{- if .Values.listener.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command: ["/bin/sh","-lc","echo ok"]
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          {{- end }}
+
+        {{- if .Values.listener.loadGenerator.enabled }}
+        - name: load-generator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash","-lc"]
+          args:
+            - |
+              source /opt/ros/humble/setup.bash
+              echo "Starting Load Generator..."
+              python3 /scripts/load_sim.py
+          env:
+            - name: ROS_DOMAIN_ID
+              value: {{ .Values.commonEnv.ROS_DOMAIN_ID | quote }}
+            - name: RMW_IMPLEMENTATION
+              value: {{ .Values.commonEnv.RMW_IMPLEMENTATION | quote }}
+            - name: ROS_LOCALHOST_ONLY
+              value: {{ .Values.commonEnv.ROS_LOCALHOST_ONLY | quote }}
+            - name: MESSAGE_RATE
+              value: {{ .Values.listener.loadGenerator.messageRate | quote }}
+            - name: TOPIC_NAME
+              value: {{ .Values.listener.loadGenerator.topicName | quote }}
+          volumeMounts:
+            - name: load-sim
+              mountPath: /scripts
+          resources:
+            {{- toYaml .Values.resources.loadGenerator | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
         {{- end }}
-      restartPolicy: Always
-{{- end }}

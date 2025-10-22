@@ -1,14 +1,20 @@
+{{- if and .Values.talker.service.enabled (.Values.talker.service.ports) }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-talker
   labels:
-    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.talker.service.type | default "ClusterIP" }}
   selector:
     app: talker
+    app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
-    - port: {{ .Values.service.talker.port }}
-      targetPort: {{ .Values.service.talker.targetPort }}
+  {{- range .Values.talker.service.ports }}
+    - name: {{ required "nombre de puerto requerido" .name }}
+      port: {{ required "port requerido" .port }}
+      targetPort: {{ required "targetPort requerido" .targetPort }}
+      protocol: {{ .protocol | default "UDP" }}
+  {{- end }}
+{{- end }}

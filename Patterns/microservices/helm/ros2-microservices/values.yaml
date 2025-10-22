@@ -1,78 +1,91 @@
-# values.yaml para Microservices Pattern
-# Cada nodo ROS 2 como un servicio independiente
-
 image:
   repository: osrf/ros
   tag: humble-desktop
   pullPolicy: IfNotPresent
+imagePullSecrets: []   # p.ej.: [{name: myregistry}]
 
-# Configuración ROS 2 global
-ros:
-  domainId: 42
-  rmwImplementation: rmw_fastrtps_cpp
+resources:
+  talker:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
+  listener:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 300m, memory: 256Mi }
+  loadGenerator:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
 
-# Microservicio: Talker (Publisher)
+commonEnv:
+  ROS_DOMAIN_ID: "42"
+  RMW_IMPLEMENTATION: "rmw_fastrtps_cpp"
+  ROS_LOCALHOST_ONLY: "0"
+
 talker:
   enabled: true
-  replicaCount: 1
-  nodeSelector:
-    role: edge
-    kubernetes.io/hostname: kb-edge01
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
-  component:
-    package: demo_nodes_cpp
-    executable: talker
-    # Para tu aplicación:
-    # package: your_package
-    # executable: your_publisher_node
+  nodeSelector: { role: edge }   # <-- Raspberry (arm64)
+  affinity: {}
+  tolerations: []
+  extraEnv: []
+  # Opcionalmente puedes exponer Service del talker; por defecto, off:
+  service:
+    enabled: false
+    type: ClusterIP
+    ports: []   # añade si lo necesitas
 
-# Microservicio: Listener (Subscriber)
 listener:
   enabled: true
-  replicaCount: 1
-  nodeSelector:
-    role: cloud
-    kubernetes.io/hostname: kb2
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
-  component:
-    package: demo_nodes_cpp
-    executable: listener
+  nodeSelector: { role: cloud }  # <-- kb2 (amd64)
+  affinity: {}
+  tolerations: []
+  extraEnv: []
+  readinessProbe:
+    enabled: false    # Actívala cuando tengas un healthcheck real
+  livenessProbe:
+    enabled: true     # Liveness exec básica para ROS2
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: dds-discovery
+        port: 7400
+        targetPort: 7400
+        protocol: UDP
+      - name: dds-user
+        port: 7401
+        targetPort: 7401
+        protocol: UDP
+  loadGenerator:
+    enabled: true
+    messageRate: 10
+    topicName: "load_topic"
 
-# Load Generator
-loadGenerator:
-  enabled: true
-  # El load generator se despliega con el listener (sidecar)
-  messageRate: 10
-  scriptPath: load_sim.py
-  topic: load_topic
+config:
+  loadSimScript: |
+    #!/usr/bin/env python3
+    import os, time, rclpy
+    from rclpy.node import Node
+    from std_msgs.msg import String
 
-# Servicios
-service:
-  type: ClusterIP
-  talker:
-    port: 11311
-    targetPort: 11311
-  listener:
-    port: 11312
-    targetPort: 11312
+    class LoadPublisher(Node):
+        def __init__(self):
+            super().__init__('load_publisher')
+            topic = os.environ.get('TOPIC_NAME','load_topic')
+            hz = float(os.environ.get('MESSAGE_RATE','10'))
+            self.pub = self.create_publisher(String, topic, 10)
+            self.timer = self.create_timer(1.0/max(hz,0.1), self.tick)
+            self.i = 0
 
-# Networking
-networking:
-  # Configuración para permitir DDS discovery entre pods
-  hostNetwork: false
-  dnsPolicy: ClusterFirst
+        def tick(self):
+            msg = String()
+            msg.data = f"load msg {self.i}"
+            self.pub.publish(msg)
+            self.i += 1
 
-nameOverride: ""
-fullnameOverride: ""
+    rclpy.init()
+    node = LoadPublisher()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    node.destroy_node()
+    rclpy.shutdown()

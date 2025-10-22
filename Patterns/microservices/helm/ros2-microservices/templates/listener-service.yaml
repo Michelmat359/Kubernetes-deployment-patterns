@@ -1,14 +1,22 @@
+{{- if .Values.listener.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "ros2-microservices.fullname" . }}-listener
   labels:
-    app.kubernetes.io/name: {{ include "ros2-microservices.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "ros2-microservices.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.listener.service.type | default "ClusterIP" }}
   selector:
     app: listener
+    app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
-    - port: {{ .Values.service.listener.port }}
-      targetPort: {{ .Values.service.listener.targetPort }}
+  {{- $ports := .Values.listener.service.ports | default list -}}
+  {{- if not $ports }}{{ fail "listener.service.ports requerido (UDP 7400/7401)" }}{{ end -}}
+  {{- range $ports }}
+    - name: {{ required "nombre de puerto requerido" .name }}
+      port: {{ required "port requerido" .port }}
+      targetPort: {{ required "targetPort requerido" .targetPort }}
+      protocol: {{ .protocol | default "UDP" }}
+  {{- end }}
+{{- end }}
