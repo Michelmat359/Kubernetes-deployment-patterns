@@ -8,3 +8,15 @@ tcl4. **Dynamic Module Loading** - Helm chart for runtime composition with FastA
 
 Each pattern includes a workload generator configurable via environment variables or `values.yaml`.
 Prometheus and Grafana can be installed via community Helm charts for observability.
+
+## Prerequisites
+- K3s cluster
+- kubectl
+- Helm
+- ...
+
+## Deployment Patterns
+(TODO: Add some instructions for each pattern)
+
+## Benchmarking set-up
+### 
