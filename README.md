@@ -2,21 +2,57 @@
 
 This repository provides four deployment patterns for running ROS 2 (Humble) applications on K3s with load simulation and monitoring hooks.
 
-1. **Monolithic Deployment** - simple YAML manifest.
-2. **Microservices Deployment** - Helm chart for separated nodes.
-tcl4. **Dynamic Module Loading** - Helm chart for runtime composition with FastAPI.
+- **Monolithic deployment** — Single container image with multiple ROS 2 nodes launched together. Simpler to ship; lowest internal messaging overhead; least modular for updates.
+- **Microservices deployment** — Separate containers per capability (e.g., perception, inference, navigation), orchestrated via Kubernetes/Helm; enables independent scaling and fault isolation.
+- **Dynamic module loading (ROS 2 composition)** — Runtime loading/unloading of component nodes into a component manager; exposes control endpoints to compose functionality on the fly.
+- **Overlay workspaces** — Deliver new/updated ROS 2 packages as overlays on top of a stable base, minimizing rebuilds and enabling fast feature rollouts.
 
-Each pattern includes a workload generator configurable via environment variables or `values.yaml`.
-Prometheus and Grafana can be installed via community Helm charts for observability.
+Each pattern includes:
+- a **workload generator** (configurable via env vars / `values.yaml`) to simulate camera frames and inference load, and
+- **observability hooks** (Prometheus/Grafana) for runtime metrics.
+
 
 ## Prerequisites
-- K3s cluster
-- kubectl
-- Helm
-- ...
+- A running **K3s** (or Kubernetes) cluster with `kubectl` access
+- **Helm** 3.x
+- Optional GPU edge device (e.g., Jetson) if you want GPU inference and power stats
+- Basic ROS2 networking setup (e.g., `RMW_IMPLEMENTATION`, `ROS_DOMAIN_ID`)
+
 
 ## Deployment Patterns
 (TODO: Add some instructions for each pattern)
+1. Monolithic Container
+
+- **Pros**: simplest shipping; no inter-container ROS overhead; low intra-process latency.
+- **Cons**: large image footprint; coarse-grained updates; limited fault isolation.
+- **Instructions**: 
+  1. adsda
+  2. asdas
+
+2. Microservices
+
+- **Pros**: per-service scaling; independent updates; stronger isolation/least-privilege.
+- **Cons**: more moving parts; network overhead between nodes; requires DevOps discipline.
+- **Instructions**: 
+  1. adsda
+  2. asdas
+
+3. Dynamic Module Loading (ROS 2 Composition)
+
+- **Pros**: runtime reconfiguration; fast iteration; shared process memory (reduced IPC).
+- **Cons**: weaker isolation across dynamically loaded components; secure loading policy required.
+- **Instructions**: 
+  1. adsda
+  2. asdas
+
+4. Overlay Workspaces
+
+- **Pros**: small incremental updates; keep base immutable; fast rollouts of models/features.
+- **Cons**: dependency boundaries must be curated; overlay depth should stay shallow.
+- **Instructions**: 
+  1. adsda
+  2. asdas
+
 
 ## Benchmarking metrics
 The following metrics are collected for benchmarking:
