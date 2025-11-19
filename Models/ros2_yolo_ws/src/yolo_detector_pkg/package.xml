@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>yolo_detector_pkg</name>
+  <version>0.1.0</version>
+  <description>YOLO detector that subscribes to /camera/image_raw and publishes /detections</description>
+  <maintainer email="mmateo@cigip.upv.es">Miguel Angel Mateo-Casali</maintainer>
+  <license>MIT - CIGIP</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>vision_msgs</depend>
+  <depend>cv_bridge</depend>
+  <exec_depend>image_transport</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
